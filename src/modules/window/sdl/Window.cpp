@@ -42,10 +42,16 @@
 // SDL
 #include <SDL_syswm.h>
 
+#ifdef LOVE_UWP_ANGLE
+#include "UWPEGL.h"
+#endif
+
 #if defined(LOVE_WINDOWS)
 #include <windows.h>
+#if !defined(LOVE_WINDOWS_UWP)
 #include <dwmapi.h>
 #include <VersionHelpers.h>
+#endif
 #elif defined(LOVE_MACOSX)
 #include "common/macosx.h"
 #endif
@@ -70,6 +76,9 @@ Window::Window()
 	, hasSDL203orEarlier(false)
 	, contextAttribs()
 {
+#ifdef LOVE_UWP_ANGLE
+	SDL_SetHint(SDL_HINT_OPENGL_ES_DRIVER, "1");
+#endif
 	if (SDL_InitSubSystem(SDL_INIT_VIDEO) < 0)
 		throw love::Exception("Could not initialize SDL video subsystem (%s)", SDL_GetError());
 
@@ -252,7 +261,7 @@ std::vector<Window::ContextAttribs> Window::getContextAttribsList() const
 	std::vector<ContextAttribs> glescontexts = {{2, 0, true, debug}};
 
 	// While UWP SDL is above 2.0.4, it still doesn't support OpenGL ES 3+
-#ifndef LOVE_WINDOWS_UWP
+#if !defined(LOVE_WINDOWS_UWP) || defined(LOVE_UWP_ANGLE)
 	// OpenGL ES 3+ contexts are only properly supported in SDL 2.0.4+.
 	if (!hasSDL203orEarlier)
 		glescontexts.insert(preferGL2 ? glescontexts.end() : glescontexts.begin(), {3, 0, true, debug});
@@ -425,6 +434,17 @@ bool Window::setWindow(int width, int height, WindowSettings *settings)
 	if (graphics.get() && graphics->isCanvasActive())
 		throw love::Exception("love.window.setMode cannot be called while a Canvas is active in love.graphics.");
 
+#ifdef LOVE_WINDOWS_UWP
+	if (window)
+	{
+		WindowSettings f = this->settings;
+		if (settings)
+			f = *settings;
+		graphics->setMode(width, height, width, height, f.stencil);
+		return true;
+	}
+#endif
+
 	WindowSettings f;
 
 	if (settings)
@@ -561,6 +581,14 @@ bool Window::onSizeChanged(int width, int height)
 
 	SDL_GL_GetDrawableSize(window, &pixelWidth, &pixelHeight);
 
+#ifdef LOVE_UWP_ANGLE
+	if (auto size = getEGLSurfaceSize())
+	{
+		pixelWidth = size->width;
+		pixelHeight = size->height;
+	}
+#endif
+
 	if (graphics.get())
 	{
 		double scaledw, scaledh;
@@ -578,6 +606,14 @@ void Window::updateSettings(const WindowSettings &newsettings, bool updateGraphi
 	// Set the new display mode as the current display mode.
 	SDL_GetWindowSize(window, &windowWidth, &windowHeight);
 	SDL_GL_GetDrawableSize(window, &pixelWidth, &pixelHeight);
+
+#ifdef LOVE_UWP_ANGLE
+	if (auto size = getEGLSurfaceSize())
+	{
+		pixelWidth = size->width;
+		pixelHeight = size->height;
+	}
+#endif
 
 	if ((wflags & SDL_WINDOW_FULLSCREEN_DESKTOP) == SDL_WINDOW_FULLSCREEN_DESKTOP)
 	{
@@ -1021,7 +1057,7 @@ bool Window::isMinimized() const
 
 void Window::swapBuffers()
 {
-#ifdef LOVE_WINDOWS
+#if defined(LOVE_WINDOWS) && !defined(LOVE_WINDOWS_UWP)
 	bool useDwmFlush = false;
 	int swapInterval = getVSync();
 
@@ -1065,7 +1101,7 @@ void Window::swapBuffers()
 
 	SDL_GL_SwapWindow(window);
 
-#ifdef LOVE_WINDOWS
+#if defined(LOVE_WINDOWS) && !defined(LOVE_WINDOWS_UWP)
 	if (useDwmFlush)
 	{
 		DwmFlush();

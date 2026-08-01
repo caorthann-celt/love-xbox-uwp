@@ -21,17 +21,24 @@
 #define _CRT_SECURE_NO_WARNINGS 1
 #endif
 #include <windows.h>
+#include <winrt/Windows.ApplicationModel.h>
+#include <winrt/Windows.Storage.h>
+#include <string>
 
 #include "physfs_internal.h"
 
 const void *__PHYSFS_winrtCalcBaseDir(void)
 {
-    return Windows::ApplicationModel::Package::Current->InstalledLocation->Path->Data();
+    static const std::wstring path =
+        winrt::Windows::ApplicationModel::Package::Current().InstalledLocation().Path().c_str();
+    return path.c_str();
 } /* __PHYSFS_winrtCalcBaseDir */
 
 const void *__PHYSFS_winrtCalcPrefDir(void)
 {
-    return Windows::Storage::ApplicationData::Current->LocalFolder->Path->Data();
+    static const std::wstring path =
+        winrt::Windows::Storage::ApplicationData::Current().LocalFolder().Path().c_str();
+    return path.c_str();
 } /* __PHYSFS_winrtCalcBaseDir */
 
 

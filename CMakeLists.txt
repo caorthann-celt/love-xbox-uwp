@@ -23,11 +23,24 @@ if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_BINARY_DIR})
 	message(FATAL_ERROR "Prevented in-tree build.")
 endif()
 
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.15)
 
 project(love)
 
-set(LOVE_EXE_NAME love)
+set(LOVE_UWP_BUILD OFF)
+if(CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
+	set(LOVE_UWP_BUILD ON)
+	option(LOVE_UWP_LUAJIT "Use LuaJIT on UWP" ON)
+	option(LOVE_UWP_ANGLE "Use SDL's EGL path on UWP" OFF)
+	set(LOVE_JIT ${LOVE_UWP_LUAJIT} CACHE BOOL "Use LuaJIT" FORCE)
+	set(LOVE_MPG123 OFF CACHE BOOL "Use mpg123" FORCE)
+endif()
+
+if(LOVE_UWP_BUILD)
+	set(LOVE_EXE_NAME lovestatic)
+else()
+	set(LOVE_EXE_NAME love)
+endif()
 set(LOVE_LIB_NAME liblove)
 
 set(CMAKE_MODULE_PATH "${love_SOURCE_DIR}/extra/cmake" ${CMAKE_MODULE_PATH})
@@ -177,7 +190,7 @@ if(MEGA)
 		# automatically.
 	endif()
 else()
-	if(MSVC)
+	if(MSVC AND NOT LOVE_UWP_BUILD)
 		message(FATAL_ERROR "
 It is currently only possible to build with megasource or (experimental) mingw on Windows.
 Please see https://github.com/love2d/megasource
@@ -185,10 +198,29 @@ Please see https://github.com/love2d/megasource
 	endif()
 
 	find_package(Freetype REQUIRED)
-	find_package(ModPlug REQUIRED)
+	if(NOT LOVE_UWP_BUILD)
+		find_package(ModPlug REQUIRED)
+	endif()
 	find_package(OpenAL REQUIRED)
-	find_package(OpenGL REQUIRED)
-	find_package(SDL2 REQUIRED CONFIG COMPONENTS SDL2main)
+	if(NOT LOVE_UWP_BUILD OR NOT LOVE_UWP_ANGLE)
+		find_package(OpenGL REQUIRED)
+	endif()
+	if(LOVE_UWP_BUILD)
+		set(LOVE_UWP_SDL_ROOT "$ENV{LOVE_UWP_SDL_ROOT}" CACHE PATH "UWP SDL installation")
+		if(NOT LOVE_UWP_SDL_ROOT)
+			message(FATAL_ERROR "Set LOVE_UWP_SDL_ROOT to the UWP SDL installation.")
+		endif()
+		set(SDL2_INCLUDE_DIRS "${LOVE_UWP_SDL_ROOT}/include/SDL2")
+		set(SDL2_LIBRARIES "${LOVE_UWP_SDL_ROOT}/lib/SDL2.lib")
+		if(NOT EXISTS "${SDL2_LIBRARIES}")
+			message(FATAL_ERROR "LOVE_UWP_SDL_ROOT does not contain lib/SDL2.lib.")
+		endif()
+		if(LOVE_UWP_ANGLE)
+			set(OPENGL_gl_LIBRARY "")
+		endif()
+	else()
+		find_package(SDL2 REQUIRED CONFIG COMPONENTS SDL2main)
+	endif()
 	find_package(Theora REQUIRED)
 	find_package(Vorbis REQUIRED)
 	find_package(ZLIB REQUIRED)
@@ -234,7 +266,12 @@ Please see https://github.com/love2d/megasource
 		)
 	endif()
 
-	if(LOVE_JIT)
+	if(LOVE_JIT AND LOVE_UWP_BUILD)
+		include(extra/cmake/LuaJITUWP.cmake)
+		love_add_luajit_uwp(love_luajit)
+		set(LOVE_LUA_LIBRARY love_luajit)
+		set(LOVE_LUA_INCLUDE_DIR "${LOVE_LUAJIT_SOURCE_DIR}/src")
+	elseif(LOVE_JIT)
 		find_package(LuaJIT REQUIRED)
 		set(LOVE_LUA_LIBRARY ${LUAJIT_LIBRARY})
 		set(LOVE_LUA_INCLUDE_DIR ${LUAJIT_INCLUDE_DIR})
@@ -1106,6 +1143,12 @@ set(LOVE_SRC_MODULE_WINDOW_SDL
 	src/modules/window/sdl/Window.cpp
 	src/modules/window/sdl/Window.h
 )
+if(LOVE_UWP_BUILD AND LOVE_UWP_ANGLE)
+	list(APPEND LOVE_SRC_MODULE_WINDOW_SDL
+		src/modules/window/sdl/UWPEGL.cpp
+		src/modules/window/sdl/UWPEGL.h
+	)
+endif()
 
 set(LOVE_SRC_MODULE_WINDOW
 	${LOVE_SRC_MODULE_WINDOW_ROOT}
@@ -1315,6 +1358,12 @@ set(LOVE_SRC_3P_ENET
 
 add_library(love_3p_enet ${LOVE_SRC_3P_ENET})
 target_link_libraries(love_3p_enet ${LOVE_LUA_LIBRARY})
+if(LOVE_UWP_BUILD)
+	target_compile_definitions(love_3p_enet PRIVATE
+		_CRT_SECURE_NO_WARNINGS=1
+		_WINSOCK_DEPRECATED_NO_WARNINGS=1
+	)
+endif()
 target_include_directories(love_3p_enet PUBLIC src/libraries/enet/libenet/include)
 if(MINGW)
 	target_link_libraries(love_3p_enet winmm.a)
@@ -1553,6 +1602,12 @@ set(LOVE_SRC_3P_LUASOCKET
 
 add_library(love_3p_luasocket ${LOVE_SRC_3P_LUASOCKET})
 target_link_libraries(love_3p_luasocket ${LOVE_LUA_LIBRARY} ${LOVE_LINK_L3P_LUASOCKET_LIBLUASOCKET})
+if(LOVE_UWP_BUILD)
+	target_compile_definitions(love_3p_luasocket PRIVATE
+		_CRT_SECURE_NO_WARNINGS=1
+		_WINSOCK_DEPRECATED_NO_WARNINGS=1
+	)
+endif()
 
 #
 # APIs from Lua 5.3
@@ -1766,7 +1821,7 @@ link_directories(${LOVE_LINK_DIRS})
 
 set(LOVE_RC)
 
-if(MSVC OR MINGW)
+if((MSVC OR MINGW) AND NOT LOVE_UWP_BUILD)
 	set(LOVE_LINK_LIBRARIES ${LOVE_LINK_LIBRARIES}
 		ws2_32${WIN32_LIB_EXT}
 		winmm${WIN32_LIB_EXT}
@@ -1785,9 +1840,31 @@ if(MSVC OR MINGW)
 	endif()
 endif()
 
+if(LOVE_UWP_BUILD)
+	set(LOVE_LINK_LIBRARIES ${LOVE_LINK_LIBRARIES}
+		ws2_32.lib
+		WindowsApp.lib
+	)
+endif()
+
 add_library(${LOVE_LIB_NAME} SHARED ${LOVE_LIB_SRC} ${LOVE_RC})
 set_target_properties(${LOVE_LIB_NAME} PROPERTIES C_VISIBILITY_PRESET hidden CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
 target_link_libraries(${LOVE_LIB_NAME} ${LOVE_LINK_LIBRARIES} ${LOVE_3P})
+
+if(LOVE_UWP_BUILD)
+	if(LOVE_UWP_ANGLE)
+		target_compile_definitions(${LOVE_LIB_NAME} PRIVATE LOVE_UWP_ANGLE=1 LOVE_GRAPHICS_USE_OPENGLES=1)
+	endif()
+	target_compile_definitions(${LOVE_LIB_NAME} PRIVATE
+		_CRT_SECURE_NO_WARNINGS=1
+		_CRT_NONSTDC_NO_WARNINGS=1
+		_WINSOCK_DEPRECATED_NO_WARNINGS=1
+		_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING=1
+	)
+	target_compile_features(${LOVE_LIB_NAME} PRIVATE cxx_std_17)
+	target_compile_definitions(love_3p_physfs PRIVATE PHYSFS_PLATFORM_WINRT=1)
+	target_compile_features(love_3p_physfs PRIVATE cxx_std_17)
+endif()
 
 if(LOVE_EXTRA_DEPENDECIES)
 	add_dependencies(${LOVE_LIB_NAME} ${LOVE_EXTRA_DEPENDECIES})
@@ -1801,11 +1878,15 @@ endif()
 #
 # love (executable)
 #
-add_executable(${LOVE_EXE_NAME} WIN32 src/love.cpp ${LOVE_RC})
+if(LOVE_UWP_BUILD)
+	add_library(${LOVE_EXE_NAME} STATIC src/love.cpp)
+else()
+	add_executable(${LOVE_EXE_NAME} WIN32 src/love.cpp ${LOVE_RC})
+endif()
 target_link_libraries(${LOVE_EXE_NAME} ${LOVE_LIB_NAME})
 set_target_properties(${LOVE_EXE_NAME} PROPERTIES C_VISIBILITY_PRESET hidden CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
 
-if(MSVC OR MINGW)
+if((MSVC OR MINGW) AND NOT LOVE_UWP_BUILD)
 	add_executable(${LOVE_CONSOLE_EXE_NAME} src/love.cpp ${LOVE_RC})
 	target_link_libraries(${LOVE_CONSOLE_EXE_NAME} ${LOVE_LIB_NAME})
 endif()
@@ -1829,7 +1910,7 @@ endfunction()
 # running/debugging the binary will not work from inside VS.
 if(LOVE_MOVE_DLLS)
 	foreach(DLL ${LOVE_MOVE_DLLS})
-		post_step_move_dll(love ${DLL})
+		post_step_move_dll(${LOVE_EXE_NAME} ${DLL})
 	endforeach()
 endif()
 
@@ -1862,7 +1943,11 @@ message(STATUS "Version: ${LOVE_VERSION_STR}")
 ###################################
 # CPack
 ###################################
-install(TARGETS ${LOVE_EXE_NAME} ${LOVE_CONSOLE_EXE_NAME} ${LOVE_LIB_NAME} RUNTIME DESTINATION .)
+if(LOVE_UWP_BUILD)
+	install(TARGETS ${LOVE_EXE_NAME} ${LOVE_LIB_NAME} RUNTIME DESTINATION .)
+else()
+	install(TARGETS ${LOVE_EXE_NAME} ${LOVE_CONSOLE_EXE_NAME} ${LOVE_LIB_NAME} RUNTIME DESTINATION .)
+endif()
 
 # Extra DLLs.
 if(LOVE_EXTRA_DLLS)

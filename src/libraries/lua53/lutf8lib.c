@@ -38,6 +38,10 @@
 
 #include "lutf8lib.h"
 
+#ifndef lua_assert
+#define lua_assert(c) assert(c)
+#endif
+
 #include "lauxlib.h"
 #include "lualib.h"
 

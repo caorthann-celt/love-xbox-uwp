@@ -29,6 +29,8 @@ namespace theora
 
 OggDemuxer::OggDemuxer(love::filesystem::File *file)
 	: file(file)
+	, stream()
+	, page()
 	, streamInited(false)
 	, videoSerial(0)
 	, eos(false)
@@ -48,7 +50,13 @@ bool OggDemuxer::readPage(bool erroreof)
 	char *syncBuffer = nullptr;
 	while (ogg_sync_pageout(&sync, &page) != 1)
 	{
-		if (syncBuffer && !streamInited && ogg_stream_check(&stream))
+		bool invalid = false;
+#ifdef LOVE_WINDOWS_UWP
+		invalid = stream.body_data == nullptr;
+#else
+		invalid = ogg_stream_check(&stream) != 0;
+#endif
+		if (syncBuffer && !streamInited && invalid)
 			throw love::Exception("Invalid stream");
 
 		syncBuffer = ogg_sync_buffer(&sync, 8192);

@@ -2,6 +2,7 @@
 /extra/reshax/Debug/
 /extra/reshax/resources.h
 /extra/reshax/resources.cpp
+/build/
 *.obj
 *.o
 *.dirstamp

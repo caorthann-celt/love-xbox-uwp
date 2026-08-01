@@ -8,7 +8,7 @@ extern "C" {
 
 #include "lua.h"
 
-LUALIB_API int luaopen_luautf8(lua_State *L);
+int luaopen_luautf8(lua_State *L);
 
 #ifdef __cplusplus
 }

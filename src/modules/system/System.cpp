@@ -22,6 +22,11 @@
 #include "common/config.h"
 #include "System.h"
 
+#if defined(LOVE_WINDOWS_UWP)
+#include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.System.h>
+#endif
+
 #if defined(LOVE_MACOSX)
 #include <CoreServices/CoreServices.h>
 #elif defined(LOVE_IOS)
@@ -32,9 +37,11 @@
 #include <errno.h>
 #elif defined(LOVE_WINDOWS)
 #include "common/utf8.h"
+#if !defined(LOVE_WINDOWS_UWP)
 #include <shlobj.h>
 #include <shellapi.h>
 #pragma comment(lib, "shell32.lib")
+#endif
 #endif
 #if defined(LOVE_ANDROID)
 #include "common/android.h"
@@ -145,26 +152,22 @@ bool System::openURL(const std::string &url) const
 	// Unicode-aware WinAPI functions don't accept UTF-8, so we need to convert.
 	std::wstring wurl = to_widestr(url);
 
-	HINSTANCE result = 0;
-
 #if defined(LOVE_WINDOWS_UWP)
-	
-	Platform::String^ urlString = ref new Platform::String(wurl.c_str());
-	auto uwpUri = ref new Windows::Foundation::Uri(urlString);
-	Windows::System::Launcher::LaunchUriAsync(uwpUri);
+	auto uri = winrt::Windows::Foundation::Uri(wurl);
+	winrt::Windows::System::Launcher::LaunchUriAsync(uri);
+	return true;
 
 #else
 
-	result = ShellExecuteW(nullptr,
+	HINSTANCE result = ShellExecuteW(nullptr,
 		L"open",
 		wurl.c_str(),
 		nullptr,
 		nullptr,
 		SW_SHOW);
 
-#endif
-
 	return (ptrdiff_t) result > 32;
+#endif
 
 #endif
 }

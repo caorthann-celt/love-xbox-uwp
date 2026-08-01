@@ -1013,6 +1013,8 @@ set(LOVE_SRC_MODULE_SYSTEM_ROOT
 
 if(LOVE_UWP_BUILD)
 	list(APPEND LOVE_SRC_MODULE_SYSTEM_ROOT
+		src/modules/system/uwp/FilePicker.cpp
+		src/modules/system/uwp/FilePicker.h
 		src/modules/system/uwp/HttpDownload.cpp
 		src/modules/system/uwp/HttpDownload.h
 	)

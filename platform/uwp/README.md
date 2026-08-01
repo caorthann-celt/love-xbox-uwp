@@ -22,3 +22,5 @@ cmake --build build/uwp-x64-angle --config RelWithDebInfo
 ```
 
 `LOVE_UWP_SDL_ROOT` must contain `include/SDL2` and `lib/SDL2.lib`. The build produces `liblove.dll`, its import library, `lovestatic.lib`, and `lua51.dll`.
+
+The `gen1recomp` branch adds an asynchronous `love.system` file picker for ROMs, mod archives, and save files. Selected files are copied to LocalState before their absolute paths are returned to Lua.

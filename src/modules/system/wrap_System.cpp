@@ -23,6 +23,7 @@
 #include "sdl/System.h"
 
 #ifdef LOVE_WINDOWS_UWP
+#include "uwp/FilePicker.h"
 #include "uwp/HttpDownload.h"
 #endif
 
@@ -115,6 +116,33 @@ int w_httpDownload(lua_State *L)
 	luax_pushboolean(L, uwp::httpDownload(url, path, userAgent, accept));
 	return 1;
 }
+
+int w_pickFile(lua_State *L)
+{
+	const char *kind = luaL_optstring(L, 1, "rom");
+	luax_pushboolean(L, uwp::pickFile(kind));
+	return 1;
+}
+
+int w_getPickedFile(lua_State *L)
+{
+	std::string path;
+	if (uwp::takePickedFile(path))
+		luax_pushstring(L, path);
+	else
+		lua_pushnil(L);
+	return 1;
+}
+
+int w_getPickError(lua_State *L)
+{
+	std::string error;
+	if (uwp::takePickError(error))
+		luax_pushstring(L, error);
+	else
+		lua_pushnil(L);
+	return 1;
+}
 #endif
 
 static const luaL_Reg functions[] =
@@ -129,6 +157,9 @@ static const luaL_Reg functions[] =
 	{ "hasBackgroundMusic", w_hasBackgroundMusic },
 #ifdef LOVE_WINDOWS_UWP
 	{ "httpDownload", w_httpDownload },
+	{ "pickFile", w_pickFile },
+	{ "getPickedFile", w_getPickedFile },
+	{ "getPickError", w_getPickError },
 #endif
 	{ 0, 0 }
 };

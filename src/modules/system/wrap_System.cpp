@@ -22,6 +22,10 @@
 #include "wrap_System.h"
 #include "sdl/System.h"
 
+#ifdef LOVE_WINDOWS_UWP
+#include "uwp/HttpDownload.h"
+#endif
+
 namespace love
 {
 namespace system
@@ -101,6 +105,18 @@ int w_hasBackgroundMusic(lua_State *L)
 	return 1;
 }
 
+#ifdef LOVE_WINDOWS_UWP
+int w_httpDownload(lua_State *L)
+{
+	const char *url = luaL_checkstring(L, 1);
+	const char *path = luaL_checkstring(L, 2);
+	const char *userAgent = luaL_optstring(L, 3, "love");
+	const char *accept = luaL_optstring(L, 4, nullptr);
+	luax_pushboolean(L, uwp::httpDownload(url, path, userAgent, accept));
+	return 1;
+}
+#endif
+
 static const luaL_Reg functions[] =
 {
 	{ "getOS", w_getOS },
@@ -111,6 +127,9 @@ static const luaL_Reg functions[] =
 	{ "openURL", w_openURL },
 	{ "vibrate", w_vibrate },
 	{ "hasBackgroundMusic", w_hasBackgroundMusic },
+#ifdef LOVE_WINDOWS_UWP
+	{ "httpDownload", w_httpDownload },
+#endif
 	{ 0, 0 }
 };
 

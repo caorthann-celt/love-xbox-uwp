@@ -1011,6 +1011,13 @@ set(LOVE_SRC_MODULE_SYSTEM_ROOT
 	src/modules/system/wrap_System.h
 )
 
+if(LOVE_UWP_BUILD)
+	list(APPEND LOVE_SRC_MODULE_SYSTEM_ROOT
+		src/modules/system/uwp/HttpDownload.cpp
+		src/modules/system/uwp/HttpDownload.h
+	)
+endif()
+
 set(LOVE_SRC_MODULE_SYSTEM_SDL
 	src/modules/system/sdl/System.cpp
 	src/modules/system/sdl/System.h
